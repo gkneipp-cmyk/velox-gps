@@ -1,5 +1,5 @@
 // Service Worker do Velox GPS para suporte a PWA e carregamento instantâneo offline
-const CACHE_NAME = 'velox-gps-v3';
+const CACHE_NAME = 'velox-gps-v4';
 const ASSETS_TO_CACHE = [
   './',
   './index.html',

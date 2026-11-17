@@ -1058,6 +1058,9 @@
   // 8. MOTOR DE GEOLOCALIZAÇÃO REAL (GPS DO DISPOSITIVO)
   // ==========================================================================
   const GpsEngine = {
+    lastReverseGeocodeTime: 0,
+    hasCenteredInitialPosition: false,
+
     init() {
       if (!('geolocation' in navigator)) {
         UI.gpsStatusText.textContent = 'GPS não suportado neste aparelho';
@@ -1080,12 +1083,22 @@
     },
 
     onPositionSuccess(pos) {
+      // Quando o aparelho recebe o GPS real, desativa imediatamente qualquer simulação
       State.position.hasRealGps = true;
+      State.isSimulatorActive = false;
       UI.gpsStatusText.textContent = `GPS Ativo (±${Math.round(pos.coords.accuracy)}m)`;
 
       const lat = pos.coords.latitude;
       const lng = pos.coords.longitude;
       const heading = pos.coords.heading || 0;
+
+      // Centraliza o mapa na posição real do usuário ao receber a primeira coordenada
+      if (!this.hasCenteredInitialPosition) {
+        this.hasCenteredInitialPosition = true;
+        if (MapEngine.leafletMap) {
+          MapEngine.leafletMap.setView([lat, lng], 17, { animate: true });
+        }
+      }
 
       // Velocidade do GPS vem em metros por segundo (m/s).
       // Se for menor que 0.8 m/s (~2.8 km/h), filtra ruído/jitter de aparelho parado dentro de casa!
@@ -1098,12 +1111,31 @@
       State.position.lng = lng;
       State.position.heading = heading;
 
-      // Se não estiver em modo de teste/simulador no PC, atualiza com a velocidade real
-      if (!State.isSimulatorActive) {
-        State.currentSpeed = gpsSpeedKmH;
-        SpeedometerEngine.update(gpsSpeedKmH);
-        MapEngine.updateCarPosition(lat, lng, heading);
-        ProximityEngine.checkProximity();
+      State.currentSpeed = gpsSpeedKmH;
+      SpeedometerEngine.update(gpsSpeedKmH);
+      MapEngine.updateCarPosition(lat, lng, heading);
+      ProximityEngine.checkProximity();
+
+      // Busca o nome real da rua atual do usuário para exibir no painel superior (a cada 20s)
+      const now = Date.now();
+      if (now - this.lastReverseGeocodeTime > 20000) {
+        this.lastReverseGeocodeTime = now;
+        this.fetchCurrentStreetName(lat, lng);
+      }
+    },
+
+    async fetchCurrentStreetName(lat, lng) {
+      try {
+        const url = `https://nominatim.openstreetmap.org/reverse?format=json&lat=${lat}&lon=${lng}&zoom=18&addressdetails=1`;
+        const res = await fetch(url, { headers: { 'Accept-Language': 'pt-BR' } });
+        const data = await res.json();
+        if (data && data.address) {
+          const road = data.address.road || data.address.pedestrian || data.address.suburb || data.address.neighbourhood || 'Via Atual';
+          const city = data.address.city || data.address.town || data.address.municipality || '';
+          UI.currentRoadName.textContent = city ? `${road} (${city})` : road;
+        }
+      } catch (e) {
+        console.warn('Geocodificação reversa local:', e);
       }
     },
 
@@ -1473,9 +1505,10 @@
         AudioEngine.speak('Alerta de radar inserido para teste!');
       });
 
-      // Loop de Deslocamento do Carro ao Acelerar
+      // Loop de Deslocamento do Carro ao Acelerar no Simulador
       setInterval(() => {
-        if (State.currentSpeed > 0) {
+        // Só avança a rota simulada se o simulador estiver ATIVO e o aparelho NÃO tiver GPS real ativo!
+        if (State.isSimulatorActive && !State.position.hasRealGps && State.currentSpeed > 0) {
           this.advanceVehicleAlongRoute();
         }
       }, 1000);
@@ -1493,6 +1526,11 @@
     },
 
     advanceVehicleAlongRoute() {
+      // Guarda de segurança absoluta: se o celular estiver com GPS real ativo, NUNCA sobreponha as coordenadas locais!
+      if (State.position.hasRealGps) {
+        return;
+      }
+
       // 1. Se estiver navegando para um destino ativo, segue a rota real calculada!
       if (State.isNavigating && State.routePoints.length > 1) {
         if (State.routeSimIndex === undefined) State.routeSimIndex = 0;
@@ -1920,7 +1958,7 @@
     }
 
     // Define valores iniciais na interface
-    UI.currentRoadName.textContent = 'Av. Paulista (Bela Vista, São Paulo)';
+    UI.currentRoadName.textContent = 'Localizando sua posição...';
     SpeedometerEngine.setSpeedLimit(60);
     SpeedometerEngine.update(0);
   }
