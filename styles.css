@@ -1665,10 +1665,195 @@ button {
   margin-left: 8px;
 }
 
+.sim-header-actions {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+}
+
+.sim-minimize-btn {
+  background: rgba(255, 255, 255, 0.1);
+  border: 1px solid rgba(255, 255, 255, 0.2);
+  color: #cbd5e1;
+  padding: 4px 10px;
+  border-radius: var(--radius-sm);
+  font-size: 0.78rem;
+  font-weight: 700;
+  cursor: pointer;
+  transition: all 0.15s ease;
+}
+
+.sim-minimize-btn:hover {
+  background: rgba(255, 255, 255, 0.2);
+  color: #ffffff;
+}
+
 .sim-close-btn {
   color: var(--text-secondary);
   font-size: 1rem;
   padding: 2px 6px;
+  cursor: pointer;
+}
+
+/* Aba Flutuante para Puxar o Painel de Volta */
+.sim-pullup-handle {
+  position: fixed;
+  bottom: 14px;
+  right: 18px;
+  z-index: 1100;
+  background: linear-gradient(135deg, #0284c7, #0369a1);
+  color: #ffffff;
+  border: 1.5px solid rgba(255, 255, 255, 0.35);
+  border-radius: var(--radius-full);
+  padding: 8px 16px;
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  font-family: var(--font-sans);
+  font-size: 0.85rem;
+  font-weight: 800;
+  box-shadow: 0 10px 25px rgba(2, 132, 199, 0.5), 0 0 14px rgba(56, 189, 248, 0.4);
+  cursor: pointer;
+  transition: all 0.2s cubic-bezier(0.16, 1, 0.3, 1);
+  animation: pulseGlow 2.5s infinite;
+}
+
+.sim-pullup-handle:hover {
+  transform: translateY(-2px) scale(1.03);
+  background: linear-gradient(135deg, #0ea5e9, #0284c7);
+}
+
+.sim-pullup-handle[hidden] {
+  display: none !important;
+}
+
+.sim-pullup-handle .handle-badge {
+  background: rgba(0, 0, 0, 0.25);
+  padding: 2px 8px;
+  border-radius: var(--radius-full);
+  font-size: 0.75rem;
+  color: #7dd3fc;
+}
+
+body.theme-day .sim-pullup-handle {
+  background: linear-gradient(135deg, #0284c7, #0ea5e9);
+  color: #ffffff;
+  border-color: rgba(255, 255, 255, 0.4);
+  box-shadow: 0 8px 20px rgba(2, 132, 199, 0.35);
+}
+
+/* Banner Rápido de Instalação Mobile */
+.quick-install-banner {
+  position: fixed;
+  bottom: 12px;
+  left: 50%;
+  transform: translateX(-50%);
+  width: min(94%, 480px);
+  background: linear-gradient(135deg, rgba(15, 23, 42, 0.98), rgba(30, 41, 59, 0.98));
+  backdrop-filter: blur(16px);
+  border: 1.5px solid rgba(56, 189, 248, 0.4);
+  border-radius: var(--radius-md);
+  padding: 10px 14px;
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 12px;
+  z-index: 2500;
+  box-shadow: 0 14px 40px rgba(0, 0, 0, 0.6), 0 0 25px rgba(2, 132, 199, 0.25);
+  animation: slideUpInstall 0.35s cubic-bezier(0.16, 1, 0.3, 1);
+}
+
+.quick-install-banner[hidden] {
+  display: none !important;
+}
+
+@keyframes slideUpInstall {
+  from {
+    opacity: 0;
+    transform: translate(-50%, 25px) scale(0.96);
+  }
+  to {
+    opacity: 1;
+    transform: translate(-50%, 0) scale(1);
+  }
+}
+
+.qib-content {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+}
+
+.qib-icon {
+  font-size: 1.6rem;
+  background: rgba(56, 189, 248, 0.15);
+  width: 38px;
+  height: 38px;
+  border-radius: 50%;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  flex-shrink: 0;
+}
+
+.qib-texts strong {
+  display: block;
+  font-size: 0.88rem;
+  color: #ffffff;
+}
+
+.qib-texts p {
+  font-size: 0.72rem;
+  color: #94a3b8;
+  margin: 0;
+}
+
+.qib-actions {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+}
+
+.qib-btn-install {
+  background: linear-gradient(135deg, #10b981, #059669);
+  color: #ffffff;
+  border: none;
+  border-radius: var(--radius-sm);
+  padding: 7px 12px;
+  font-size: 0.78rem;
+  font-weight: 800;
+  cursor: pointer;
+  white-space: nowrap;
+  box-shadow: 0 4px 12px rgba(16, 185, 129, 0.35);
+  transition: all 0.15s ease;
+}
+
+.qib-btn-install:hover {
+  transform: translateY(-1px);
+  box-shadow: 0 6px 15px rgba(16, 185, 129, 0.45);
+}
+
+.qib-btn-close {
+  background: transparent;
+  color: #94a3b8;
+  border: none;
+  font-size: 1rem;
+  padding: 4px 8px;
+  cursor: pointer;
+}
+
+body.theme-day .quick-install-banner {
+  background: rgba(255, 255, 255, 0.98);
+  border-color: rgba(2, 132, 199, 0.3);
+  box-shadow: 0 14px 40px rgba(0, 0, 0, 0.15);
+}
+
+body.theme-day .qib-texts strong {
+  color: #0f172a;
+}
+
+body.theme-day .qib-texts p {
+  color: #64748b;
 }
 
 .sim-controls {
@@ -2212,6 +2397,18 @@ button {
 
 .benefit-item strong {
   color: #e2e8f0;
+}
+
+/* ==========================================================================
+   FILTROS DE MAPA (NOTURNO & DIURNO 100% LIVRES DE API KEY)
+   ========================================================================== */
+body.theme-dark #map:not(.layer-satellite) .leaflet-tile {
+  filter: brightness(0.65) invert(1) contrast(3) hue-rotate(200deg) saturate(0.35);
+}
+
+body.theme-day #map .leaflet-tile,
+#map.layer-satellite .leaflet-tile {
+  filter: none !important;
 }
 
 /* ==========================================================================

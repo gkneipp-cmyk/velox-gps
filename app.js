@@ -253,6 +253,11 @@
     simulatorBar: document.getElementById('simulatorBar'),
     btnToggleSim: document.getElementById('btnToggleSim'),
     btnCloseSim: document.getElementById('btnCloseSim'),
+    btnMinimizeSim: document.getElementById('btnMinimizeSim'),
+    btnRestoreSim: document.getElementById('btnRestoreSim'),
+    quickInstallBanner: document.getElementById('quickInstallBanner'),
+    btnQuickInstall: document.getElementById('btnQuickInstall'),
+    btnCloseQuickInstall: document.getElementById('btnCloseQuickInstall'),
     simSpeedSlider: document.getElementById('simSpeedSlider'),
     simSpeedDisplay: document.getElementById('simSpeedDisplay'),
     btnSimAcc10: document.getElementById('btnSimAcc10'),
@@ -379,8 +384,7 @@
     leafletMap: null,
     carMarker: null,
     incidentMarkersGroup: null,
-    tileVoyager: null,
-    tileDark: null,
+    tileStreet: null,
     tileSatellite: null,
     activeTileLayer: null,
     routeLineGlow: null,
@@ -393,21 +397,14 @@
         return;
       }
 
-      // 1. Camada Waze Desenho Claro (CartoDB Voyager - visual vetor nítido e colorido)
-      this.tileVoyager = L.tileLayer('https://{s}.basemaps.cartocdn.com/rastertiles/voyager/{z}/{x}/{y}{r}.png', {
+      // 1. Camada Waze Desenho Claro (OpenStreetMap Padrão e Estável - 100% gratuito, SEM chave de API e sem marcas d'água)
+      this.tileStreet = L.tileLayer('https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png', {
         maxZoom: 19,
-        subdomains: 'abcd',
-        attribution: '&copy; CartoDB &copy; OpenStreetMap'
+        subdomains: ['a', 'b', 'c'],
+        attribution: '&copy; OpenStreetMap contributors'
       });
 
-      // 2. Camada Waze Desenho Noturno (CartoDB Dark Matter)
-      this.tileDark = L.tileLayer('https://{s}.basemaps.cartocdn.com/rastertiles/dark_all/{z}/{x}/{y}{r}.png', {
-        maxZoom: 19,
-        subdomains: 'abcd',
-        attribution: '&copy; CartoDB &copy; OpenStreetMap'
-      });
-
-      // 3. Camada Satélite Fotográfico Real Terrestre (Esri World Imagery)
+      // 2. Camada Satélite Fotográfico Real Terrestre (Esri World Imagery - 100% gratuito e sem chave)
       this.tileSatellite = L.tileLayer('https://server.arcgisonline.com/ArcGIS/rest/services/World_Imagery/MapServer/tile/{z}/{y}/{x}', {
         maxZoom: 19,
         attribution: 'Esri World Imagery'
@@ -455,6 +452,8 @@
     updateTileLayer() {
       if (!this.leafletMap) return;
 
+      const mapEl = document.getElementById('map');
+
       // 1. Determina se o tema é Dia ou Noite
       const hour = new Date().getHours();
       let isNight = false;
@@ -475,14 +474,13 @@
         document.body.classList.add('theme-day');
       }
 
-      // 2. Determina qual camada de mapa carregar
-      let targetLayer = this.tileVoyager;
+      // 2. Determina qual camada de mapa carregar (Desenho Waze vs Satélite Real)
+      let targetLayer = this.tileStreet;
       if (State.mapLayer === 'satellite') {
         targetLayer = this.tileSatellite;
-      } else if (isNight) {
-        targetLayer = this.tileDark;
+        if (mapEl) mapEl.classList.add('layer-satellite');
       } else {
-        targetLayer = this.tileVoyager;
+        if (mapEl) mapEl.classList.remove('layer-satellite');
       }
 
       // 3. Aplica a camada de mapa ao Leaflet
@@ -1801,16 +1799,36 @@
       UI.modalCloud.setAttribute('hidden', '');
     });
 
-    // 10. Toggle do Simulador
-    UI.btnToggleSim.addEventListener('click', () => {
-      UI.simulatorBar.classList.toggle('hidden');
-    });
-
-    UI.btnCloseSim.addEventListener('click', () => {
+    // 10. Toggle e Controle do Simulador (Painel de Teste de Velocidade & Alarme)
+    const hideSimulator = () => {
       UI.simulatorBar.classList.add('hidden');
+      if (UI.btnRestoreSim) UI.btnRestoreSim.removeAttribute('hidden');
+    };
+
+    const showSimulator = () => {
+      UI.simulatorBar.classList.remove('hidden');
+      if (UI.btnRestoreSim) UI.btnRestoreSim.setAttribute('hidden', '');
+    };
+
+    UI.btnToggleSim.addEventListener('click', () => {
+      if (UI.simulatorBar.classList.contains('hidden')) {
+        showSimulator();
+      } else {
+        hideSimulator();
+      }
     });
 
-    // 11. Modal de Instalação no Celular
+    UI.btnCloseSim.addEventListener('click', hideSimulator);
+
+    if (UI.btnMinimizeSim) {
+      UI.btnMinimizeSim.addEventListener('click', hideSimulator);
+    }
+
+    if (UI.btnRestoreSim) {
+      UI.btnRestoreSim.addEventListener('click', showSimulator);
+    }
+
+    // 11. Modal e Banner de Instalação no Celular
     const btnInstallApp = document.getElementById('btnInstallApp');
     const modalInstall = document.getElementById('modalInstall');
     const btnCloseInstallModal = document.getElementById('btnCloseInstallModal');
@@ -1823,22 +1841,46 @@
       if (btnInstallApp) {
         btnInstallApp.classList.add('pulse-glow');
       }
+      if (UI.quickInstallBanner) {
+        UI.quickInstallBanner.removeAttribute('hidden');
+      }
     });
 
-    if (btnInstallApp && modalInstall) {
-      btnInstallApp.addEventListener('click', () => {
-        if (deferredPrompt) {
-          deferredPrompt.prompt();
-          deferredPrompt.userChoice.then((choice) => {
-            if (choice.outcome === 'accepted') {
-              console.log('Usuário aceitou a instalação do Velox GPS!');
-            }
-            deferredPrompt = null;
-          });
-        } else {
-          modalInstall.removeAttribute('hidden');
-        }
+    const triggerInstallFlow = () => {
+      if (deferredPrompt) {
+        deferredPrompt.prompt();
+        deferredPrompt.userChoice.then((choice) => {
+          if (choice.outcome === 'accepted') {
+            console.log('Usuário aceitou a instalação do Velox GPS!');
+          }
+          deferredPrompt = null;
+          if (UI.quickInstallBanner) UI.quickInstallBanner.setAttribute('hidden', '');
+        });
+      } else {
+        if (modalInstall) modalInstall.removeAttribute('hidden');
+      }
+    };
+
+    if (btnInstallApp) {
+      btnInstallApp.addEventListener('click', triggerInstallFlow);
+    }
+
+    if (UI.btnQuickInstall) {
+      UI.btnQuickInstall.addEventListener('click', triggerInstallFlow);
+    }
+
+    if (UI.btnCloseQuickInstall) {
+      UI.btnCloseQuickInstall.addEventListener('click', () => {
+        if (UI.quickInstallBanner) UI.quickInstallBanner.setAttribute('hidden', '');
       });
+    }
+
+    // Se estiver em celular/tablet, exibe o banner de instalação após 2.5s se não estiver instalado
+    const isMobile = /Android|iPhone|iPad|iPod/i.test(navigator.userAgent);
+    if (isMobile && UI.quickInstallBanner && !window.matchMedia('(display-mode: standalone)').matches) {
+      setTimeout(() => {
+        UI.quickInstallBanner.removeAttribute('hidden');
+      }, 2500);
     }
 
     if (btnCloseInstallModal && modalInstall) {

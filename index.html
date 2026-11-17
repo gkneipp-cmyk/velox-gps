@@ -485,7 +485,10 @@
         <strong>Simulador de Direção (Ambiente de Testes)</strong>
         <span class="sim-helper">Use para testar aceleração, velocímetros e alertas sem precisar de um carro</span>
       </div>
-      <button class="sim-close-btn" id="btnCloseSim" title="Ocultar barra do simulador">✕</button>
+      <div class="sim-header-actions">
+        <button class="sim-minimize-btn" id="btnMinimizeSim" title="Baixar e recolher painel de teste">▼ Baixar Painel</button>
+        <button class="sim-close-btn" id="btnCloseSim" title="Ocultar barra do simulador">✕</button>
+      </div>
     </div>
 
     <div class="sim-controls">
@@ -508,6 +511,28 @@
       </div>
     </div>
   </footer>
+
+  <!-- ABA FLUTUANTE PARA PUXAR O PAINEL DE VELOCIDADE & ALARME DE VOLTA -->
+  <button class="sim-pullup-handle" id="btnRestoreSim" hidden title="Puxar painel de teste de velocidade e alarme">
+    <span class="handle-icon">🎮</span>
+    <span class="handle-text">Testar Velocidade & Alarme</span>
+    <span class="handle-badge">▲ Puxar</span>
+  </button>
+
+  <!-- BANNER RÁPIDO DE INSTALAÇÃO NO CELULAR (SEM PRECISAR CAÇAR OS 3 PONTINHOS) -->
+  <aside class="quick-install-banner" id="quickInstallBanner" hidden>
+    <div class="qib-content">
+      <span class="qib-icon">📲</span>
+      <div class="qib-texts">
+        <strong>Instalar Velox GPS no Celular</strong>
+        <p>Acesse direto com 1 toque na tela inicial</p>
+      </div>
+    </div>
+    <div class="qib-actions">
+      <button class="qib-btn-install" id="btnQuickInstall">Instalar Agora</button>
+      <button class="qib-btn-close" id="btnCloseQuickInstall" title="Fechar">✕</button>
+    </div>
+  </aside>
 
   <!-- ============================================================ -->
   <!-- MODAL 1: REPORTAR OCORRÊNCIA COLABORATIVA (ESTILO WAZE) -->
