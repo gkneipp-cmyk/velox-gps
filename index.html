@@ -1,0 +1,789 @@
+<!DOCTYPE html>
+<html lang="pt-BR">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no, viewport-fit=cover">
+  <title>Velox GPS · Navegação, Velocímetro & Alertas em Tempo Real</title>
+  <meta name="description" content="GPS colaborativo estilo Waze com velocímetro esportivo, alertas sonoros de velocidade e reporte comunitário em tempo real.">
+  <meta name="theme-color" content="#090d16">
+
+  <!-- PWA & Mobile Web App -->
+  <link rel="manifest" href="manifest.json">
+  <link rel="icon" type="image/svg+xml" href="icon.svg">
+  <link rel="icon" type="image/png" sizes="192x192" href="icon-192.png">
+  <link rel="icon" type="image/png" sizes="512x512" href="icon-512.png">
+  <link rel="apple-touch-icon" href="icon-192.png">
+  <meta name="mobile-web-app-capable" content="yes">
+  <meta name="apple-mobile-web-app-capable" content="yes">
+  <meta name="apple-mobile-web-app-status-bar-style" content="black-translucent">
+  <meta name="apple-mobile-web-app-title" content="Velox GPS">
+
+  <!-- Google Fonts -->
+  <link rel="preconnect" href="https://fonts.googleapis.com">
+  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+  <link href="https://fonts.googleapis.com/css2?family=Plus+Jakarta+Sans:wght@400;500;600;700;800&family=Orbitron:wght@500;700;900&family=Share+Tech+Mono&display=swap" rel="stylesheet">
+
+  <!-- Leaflet CSS (Mapas OpenStreetMap) -->
+  <link rel="stylesheet" href="https://unpkg.com/leaflet@1.9.4/dist/leaflet.css" integrity="sha256-p4NxAoJBhIIN+hmNHrzRCf9tD/miZyoHS5obTRR9BMY=" crossorigin=""/>
+
+  <!-- Firebase SDKs compatíveis (opcional para conexão de banco em tempo real) -->
+  <script src="https://www.gstatic.com/firebasejs/10.8.0/firebase-app-compat.js"></script>
+  <script src="https://www.gstatic.com/firebasejs/10.8.0/firebase-firestore-compat.js"></script>
+
+  <!-- Leaflet JS -->
+  <script src="https://unpkg.com/leaflet@1.9.4/dist/leaflet.js" integrity="sha256-20nQCchB9co0qIjJZRGuk2/Z9VM+kNiyxNV1lvTlZBo=" crossorigin=""></script>
+
+  <link rel="stylesheet" href="styles.css">
+</head>
+<body class="theme-dark">
+
+  <!-- ============================================================ -->
+  <!-- BARRA SUPERIOR GLOBAL (HEADER) -->
+  <!-- ============================================================ -->
+  <header class="app-header">
+    <div class="header-brand">
+      <div class="brand-logo">
+        <svg viewBox="0 0 24 24" width="22" height="22" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round">
+          <circle cx="12" cy="12" r="10"></circle>
+          <polygon points="16.24 7.76 14.12 14.12 7.76 16.24 9.88 9.88 16.24 7.76"></polygon>
+        </svg>
+      </div>
+      <div class="brand-info">
+        <div class="brand-title">VELOX <span class="brand-badge">GPS</span></div>
+        <div class="brand-subtitle" id="gpsStatusText">Conectando GPS...</div>
+      </div>
+    </div>
+
+    <!-- Seletor de Modo Principal -->
+    <nav class="mode-tabs" aria-label="Modos de exibição">
+      <button class="mode-tab active" id="tabNav" data-mode="nav" title="Ver mapa e rota em tempo real">
+        <span class="tab-icon">🗺️</span>
+        <span class="tab-text">Navegação</span>
+      </button>
+      <button class="mode-tab" id="tabCockpit" data-mode="cockpit" title="Painel e velocímetro puro em tela cheia">
+        <span class="tab-icon">🏎️</span>
+        <span class="tab-text">Cockpit</span>
+      </button>
+    </nav>
+
+    <!-- Controles Rápidos -->
+    <div class="header-controls">
+      <!-- Botão de Áudio / Voz -->
+      <button class="ctrl-btn" id="btnAudioToggle" title="Configurar Alertas Sonoros">
+        <span id="audioIcon">🔊</span>
+        <span class="ctrl-label" id="audioLabel">Som Ativo</span>
+      </button>
+
+      <!-- Status Nuvem / Banco de Dados -->
+      <button class="ctrl-btn sync-btn" id="btnCloudModal" title="Status da Nuvem e Sincronização entre Motoristas">
+        <span class="cloud-dot online" id="cloudDot"></span>
+        <span class="ctrl-label" id="cloudLabel">Nuvem Pronta</span>
+      </button>
+
+      <!-- Botão de Instalar como Aplicativo no Celular -->
+      <button class="ctrl-btn install-btn" id="btnInstallApp" title="Como Instalar no Celular (Android ou iPhone)">
+        <span>📲</span>
+        <span class="ctrl-label">Instalar no Celular</span>
+      </button>
+
+      <!-- Ativador do Simulador Desktop -->
+      <button class="ctrl-btn sim-toggle-btn" id="btnToggleSim" title="Abrir Simulador de Direção para Testar no PC">
+        <span>🎮</span>
+        <span class="ctrl-label">Simulador</span>
+      </button>
+    </div>
+  </header>
+
+  <!-- ============================================================ -->
+  <!-- BANNER DE ALERTA DE PROXIMIDADE (Desce do topo estilo Waze) -->
+  <!-- ============================================================ -->
+  <aside class="proximity-banner" id="proximityBanner" hidden aria-live="assertive">
+    <div class="prox-icon-box" id="proxIconBox">⚠️</div>
+    <div class="prox-content">
+      <div class="prox-headline">
+        <span class="prox-badge" id="proxBadge">ALERTA A 350M</span>
+        <span class="prox-time" id="proxTime">Reportado há 4 min</span>
+      </div>
+      <div class="prox-title" id="proxTitle">Radar Móvel na Via</div>
+      <div class="prox-sub" id="proxSub">Mantenha a velocidade abaixo de 60 km/h</div>
+    </div>
+    <div class="prox-action">
+      <button class="prox-dismiss-btn" id="btnDismissProx" title="Fechar alerta">✕</button>
+    </div>
+  </aside>
+
+  <!-- ============================================================ -->
+  <!-- CONTEÚDO PRINCIPAL -->
+  <!-- ============================================================ -->
+  <main class="main-container">
+
+    <!-- ========================================================== -->
+    <!-- MODO 1: NAVEGAÇÃO & MAPA COLABORATIVO ESTILO WAZE -->
+    <!-- ========================================================== -->
+    <section class="mode-view active" id="viewNav">
+      <!-- Container do Mapa Leaflet -->
+      <div id="map"></div>
+
+      <!-- Barra de Busca de Destino e Endereço Completo (Estilo Waze) -->
+      <div class="search-destination-wrapper" id="searchDestWrapper">
+        <div class="search-input-box">
+          <span class="search-icon">🔍</span>
+          <input type="text" id="inputDestination" class="search-dest-input" placeholder="Para onde você quer ir? (Digite rua, número, bairro ou cidade)..." autocomplete="off">
+          <button class="clear-search-btn" id="btnClearSearch" hidden title="Limpar busca">✕</button>
+          <button class="btn-search-go" id="btnSearchGo">Buscar</button>
+        </div>
+
+        <!-- Atalhos Rápidos de Destino -->
+        <div class="quick-dest-chips" id="quickDestChips">
+          <button class="quick-chip" data-query="Aeroporto de Congonhas, São Paulo">✈️ Aeroporto</button>
+          <button class="quick-chip" data-query="Shopping Ibirapuera, São Paulo">🛍️ Shopping</button>
+          <button class="quick-chip" data-query="Posto de Gasolina Shell">⛽ Posto de Gasolina</button>
+          <button class="quick-chip" data-query="Hospital das Clínicas, São Paulo">🏥 Hospital</button>
+          <button class="quick-chip" data-query="Parque Ibirapuera, São Paulo">🌳 Parque</button>
+        </div>
+
+        <!-- Lista de Resultados de Endereços Encontrados -->
+        <div class="search-results-dropdown" id="searchResultsDropdown" hidden>
+          <div class="results-header">Locais encontrados (Brasil):</div>
+          <div class="results-list" id="resultsListContainer"></div>
+        </div>
+      </div>
+
+      <!-- CARD DE PRÉVIA DA ROTA COM O BOTÃO INICIAR NAVEGAÇÃO -->
+      <div class="route-preview-card" id="routePreviewCard" hidden>
+        <div class="preview-header">
+          <div class="preview-dest-icon">🎯</div>
+          <div class="preview-dest-info">
+            <span class="preview-dest-label">DESTINO SELECIONADO:</span>
+            <h3 class="preview-dest-title" id="previewDestTitle">Av. Paulista, 1578 - Bela Vista</h3>
+            <p class="preview-dest-sub" id="previewDestSub">São Paulo - SP, Brasil</p>
+          </div>
+          <button class="btn-close-preview" id="btnClosePreview" title="Cancelar rota">✕</button>
+        </div>
+
+        <div class="preview-stats-row">
+          <div class="preview-stat">
+            <span class="pstat-val" id="routeTimeEst">18 min</span>
+            <span class="pstat-lbl">Tempo Estimado</span>
+          </div>
+          <div class="preview-stat">
+            <span class="pstat-val" id="routeDistEst">6.8 km</span>
+            <span class="pstat-lbl">Distância Total</span>
+          </div>
+          <div class="preview-stat">
+            <span class="pstat-val" id="routeEtaEst">23:25</span>
+            <span class="pstat-lbl">Previsão Chegada</span>
+          </div>
+        </div>
+
+        <div class="preview-actions">
+          <button class="btn-start-navigation pulse-start" id="btnStartNavigation">
+            <span class="start-icon">🚀</span>
+            <span class="start-text">INICIAR NAVEGAÇÃO</span>
+          </button>
+        </div>
+      </div>
+
+      <!-- BANNER DE MANOBRA ATIVA (PASSO A PASSO DURANTE A VIAGEM) -->
+      <div class="active-maneuver-banner" id="activeManeuverBanner" hidden>
+        <div class="maneuver-icon-box" id="maneuverIcon">➔</div>
+        <div class="maneuver-info">
+          <div class="maneuver-dist" id="maneuverDist">Em 300 metros</div>
+          <div class="maneuver-street" id="maneuverStreet">Vire à direita na Rua da Consolação</div>
+        </div>
+        <button class="btn-stop-nav" id="btnStopNav" title="Encerrar navegação">Encerrar</button>
+      </div>
+
+      <!-- Tarja de Informações da Via Atual (Topo do Mapa) -->
+      <div class="road-hud" id="roadHud">
+        <div class="road-main">
+          <div class="road-icon">🛣️</div>
+          <div class="road-details">
+            <h2 class="road-name" id="currentRoadName">Localizando via atual...</h2>
+            <div class="road-meta">
+              <span class="road-tag" id="roadTypeTag">Via Urbana</span>
+              <span class="road-tag" id="roadPavementTag">Asfalto</span>
+              <span class="road-tag" id="roadDirectionTag">Mão Dupla ⇄</span>
+            </div>
+          </div>
+        </div>
+      </div>
+
+      <!-- Elementos Flutuantes do Mapa (Sobreposição) -->
+      <div class="map-floating-overlay">
+
+        <!-- Lado Esquerdo Inferior: Velocímetro Flutuante e Placa de Limite -->
+        <div class="floating-speed-cluster">
+          <!-- Placa de Trânsito Brasileira R-19 (Limite de Velocidade) -->
+          <div class="traffic-sign-r19" id="speedLimitSign" title="Toque para alterar o limite de velocidade">
+            <div class="sign-inner">
+              <span class="sign-number" id="signSpeedValue">60</span>
+            </div>
+            <span class="sign-caption">LIMITE</span>
+          </div>
+
+          <!-- Mini Velocímetro Digital do Mapa -->
+          <div class="floating-hud-gauge" id="miniHudGauge">
+            <div class="mini-speed-num" id="navSpeedNumber">0</div>
+            <div class="mini-speed-unit">KM/H</div>
+            <div class="speed-status-pill safe" id="navSpeedStatus">DENTRO DO LIMITE</div>
+          </div>
+        </div>
+
+        <!-- Lado Direito Inferior: Botões de Ação do Motorista -->
+        <div class="floating-action-cluster">
+          <!-- Botão Centralizar Veículo -->
+          <button class="fab-btn fab-secondary" id="btnRecenter" title="Centralizar mapa na minha posição">
+            <svg viewBox="0 0 24 24" width="24" height="24" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round">
+              <circle cx="12" cy="12" r="3"></circle>
+              <path d="M12 2v3m0 14v3M2 12h3m14 0h3"></path>
+            </svg>
+          </button>
+
+          <!-- Botão Estilo Bússola / Orientação do Mapa -->
+          <button class="fab-btn fab-secondary" id="btnCompass" title="Orientar pelo Norte / Direção do Carro">
+            <svg viewBox="0 0 24 24" width="24" height="24" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round">
+              <polygon points="12 2 19 21 12 17 5 21 12 2"></polygon>
+            </svg>
+          </button>
+
+          <!-- BOTÃO GIGANTE REPORTAR OCORRÊNCIA ESTILO WAZE -->
+          <button class="fab-btn fab-report pulse-glow" id="btnOpenReportModal" title="Reportar Blitz, Radar, Buraco, Acidente na Via">
+            <span class="report-icon">📢</span>
+            <span class="report-text">REPORTAR</span>
+          </button>
+        </div>
+
+      </div>
+    </section>
+
+    <!-- ========================================================== -->
+    <!-- MODO 2: COCKPIT EM TELA CHEIA (VELOCÍMETRO PURO PARA O PAINEL) -->
+    <!-- ========================================================== -->
+    <section class="mode-view" id="viewCockpit">
+      <div class="cockpit-container">
+
+        <!-- Barra de Seleção de Temas de Velocímetro -->
+        <div class="cockpit-themes-bar">
+          <span class="theme-picker-title">ESTILO DO PAINEL:</span>
+          <div class="theme-pills">
+            <button class="theme-pill active" data-theme="digital">
+              <span>⚡</span> Digital Esportivo
+            </button>
+            <button class="theme-pill" data-theme="analog">
+              <span>⏱️</span> Analógico Clássico
+            </button>
+            <button class="theme-pill" data-theme="hud">
+              <span>🪞</span> HUD Noturno (Espelho)
+            </button>
+            <button class="theme-pill" data-theme="cyber">
+              <span>🔮</span> Cyber Neon
+            </button>
+          </div>
+        </div>
+
+        <!-- PALCO PRINCIPAL DO VELOCÍMETRO -->
+        <div class="cockpit-stage" id="cockpitStage">
+
+          <!-- ------------------------------------------------------ -->
+          <!-- TEMA 1: DIGITAL ESPORTIVO (ARCO CIRCULAR DE LEDS) -->
+          <!-- ------------------------------------------------------ -->
+          <div class="gauge-display active" id="displayDigital">
+            <div class="digital-gauge-wrapper">
+              <!-- Arco SVG de Aceleração -->
+              <svg class="digital-svg-arc" viewBox="0 0 320 320">
+                <defs>
+                  <linearGradient id="arcGradient" x1="0%" y1="0%" x2="100%" y2="100%">
+                    <stop offset="0%" stop-color="#06b6d4" />
+                    <stop offset="60%" stop-color="#10b981" />
+                    <stop offset="85%" stop-color="#f59e0b" />
+                    <stop offset="100%" stop-color="#ef4444" />
+                  </linearGradient>
+                  <filter id="glowFilter" x="-20%" y="-20%" width="140%" height="140%">
+                    <feGaussianBlur stdDeviation="6" result="blur" />
+                    <feComposite in="SourceGraphic" in2="blur" operator="over" />
+                  </filter>
+                </defs>
+                <!-- Trilha de fundo cinza -->
+                <circle class="arc-track" cx="160" cy="160" r="130" />
+                <!-- Arco ativo animado -->
+                <circle class="arc-progress" id="digitalArcProgress" cx="160" cy="160" r="130" />
+              </svg>
+
+              <!-- Mostrador Central Gigante -->
+              <div class="digital-center-content">
+                <div class="cockpit-limit-badge" id="cockpitLimitSign">
+                  <span>LIMITE</span>
+                  <strong id="cockpitSignSpeed">60</strong>
+                </div>
+                <div class="cockpit-speed-number" id="cockpitSpeedNumber">0</div>
+                <div class="cockpit-speed-unit">KM/H</div>
+                <div class="cockpit-status-tag safe" id="cockpitSpeedTag">VELOCIDADE SEGURA</div>
+              </div>
+            </div>
+          </div>
+
+          <!-- ------------------------------------------------------ -->
+          <!-- TEMA 2: ANALÓGICO CLÁSSICO COM PONTEIRO FÍSICO -->
+          <!-- ------------------------------------------------------ -->
+          <div class="gauge-display" id="displayAnalog">
+            <div class="analog-gauge-face">
+              <!-- Mostrador com Ticks e Números -->
+              <svg class="analog-svg" viewBox="0 0 340 340">
+                <defs>
+                  <radialGradient id="dialGrad" cx="50%" cy="50%" r="50%">
+                    <stop offset="0%" stop-color="#1e293b"/>
+                    <stop offset="80%" stop-color="#0f172a"/>
+                    <stop offset="100%" stop-color="#020617"/>
+                  </radialGradient>
+                </defs>
+
+                <!-- Disco do Mostrador -->
+                <circle cx="170" cy="170" r="160" fill="url(#dialGrad)" stroke="#334155" stroke-width="4"/>
+                <circle cx="170" cy="170" r="148" fill="none" stroke="#1e293b" stroke-width="2"/>
+
+                <!-- Arco da Faixa Vermelha (Zona de Perigo/Excesso) -->
+                <path id="analogRedLine" class="analog-red-zone" d="M 170 170" />
+
+                <!-- Trilha de Ticks / Marcações de 0 a 240 gerados por JS -->
+                <g id="analogTicksGroup"></g>
+
+                <!-- Ponteiro Físico Vermelho / Laranja -->
+                <g class="analog-needle-group" id="analogNeedleGroup" style="transform: rotate(-120deg);">
+                  <!-- Corpo do ponteiro -->
+                  <polygon points="170,36 166,170 174,170" fill="#ff3838" filter="drop-shadow(0 2px 6px rgba(255, 56, 56, 0.7))" />
+                  <line x1="170" y1="36" x2="170" y2="185" stroke="#ffffff" stroke-width="1.5" stroke-linecap="round"/>
+                </g>
+
+                <!-- Centro metálico do ponteiro -->
+                <circle cx="170" cy="170" r="14" fill="#334155" stroke="#64748b" stroke-width="3"/>
+                <circle cx="170" cy="170" r="6" fill="#f8fafc"/>
+              </svg>
+
+              <!-- Leitura Digital Complementar no centro inferior -->
+              <div class="analog-digital-box">
+                <span class="analog-digi-val" id="analogDigitalVal">0</span>
+                <span class="analog-digi-unit">km/h</span>
+              </div>
+            </div>
+          </div>
+
+          <!-- ------------------------------------------------------ -->
+          <!-- TEMA 3: HUD NOTURNO (COM OPÇÃO DE ESPELHAMENTO) -->
+          <!-- ------------------------------------------------------ -->
+          <div class="gauge-display" id="displayHud">
+            <div class="hud-mode-container" id="hudMirrorBox">
+              <div class="hud-header-info">
+                <span>HEAD-UP DISPLAY · VELOX</span>
+                <span class="hud-mirror-badge" id="hudMirrorBadge">MODO DIRETO (TELA)</span>
+              </div>
+              <div class="hud-speed-digits" id="hudSpeedDigits">0</div>
+              <div class="hud-speed-unit">KM/H</div>
+              <div class="hud-limit-display">
+                <span>LIMITE DA VIA: <strong id="hudLimitValue">60</strong> KM/H</span>
+              </div>
+              <!-- Botão para Inverter/Desinverter o Espelho -->
+              <button class="hud-toggle-mirror-btn" id="btnToggleMirror" title="Alternar entre modo normal e modo espelho para para-brisa">
+                🪞 Espelhar para Para-brisa do Carro
+              </button>
+              <div class="hud-instruction" id="hudInstructionText">
+                💡 Modo direto para celular no suporte. Clique no botão acima caso queira deitar o celular no painel à noite e refletir os números no vidro do para-brisa!
+              </div>
+            </div>
+          </div>
+
+          <!-- ------------------------------------------------------ -->
+          <!-- TEMA 4: CYBER FUTURISTA (NEON & TECH) -->
+          <!-- ------------------------------------------------------ -->
+          <div class="gauge-display" id="displayCyber">
+            <div class="cyber-cockpit">
+              <div class="cyber-hex-frame">
+                <div class="cyber-sub-top">SISTEMA DE TELEMETRIA · ON-LINE</div>
+                <div class="cyber-speed-row">
+                  <span class="cyber-speed" id="cyberSpeedNum">0</span>
+                  <span class="cyber-unit">KM/H</span>
+                </div>
+                <!-- Barra de RPM/Potência estilo Sci-Fi -->
+                <div class="cyber-power-bar">
+                  <div class="cyber-power-fill" id="cyberPowerFill" style="width: 0%;"></div>
+                </div>
+                <div class="cyber-stats-grid">
+                  <div class="cyber-stat-card">
+                    <span class="stat-label">STATUS</span>
+                    <span class="stat-value ok" id="cyberStatusVal">NORMAL</span>
+                  </div>
+                  <div class="cyber-stat-card">
+                    <span class="stat-label">LIMITE ATUAL</span>
+                    <span class="stat-value" id="cyberLimitVal">60 KM/H</span>
+                  </div>
+                </div>
+              </div>
+            </div>
+          </div>
+
+        </div>
+
+        <!-- Telemetria Complementar no Rodapé do Cockpit -->
+        <div class="cockpit-footer-telemetry">
+          <div class="telemetry-card">
+            <div class="tele-icon">📈</div>
+            <div class="tele-data">
+              <span class="tele-val" id="telemetryMax">0</span>
+              <span class="tele-lbl">Velocidade Máxima (km/h)</span>
+            </div>
+          </div>
+          <div class="telemetry-card">
+            <div class="tele-icon">⏱️</div>
+            <div class="tele-data">
+              <span class="tele-val" id="telemetryAvg">0</span>
+              <span class="tele-lbl">Média da Viagem (km/h)</span>
+            </div>
+          </div>
+          <div class="telemetry-card">
+            <div class="tele-icon">🧭</div>
+            <div class="tele-data">
+              <span class="tele-val" id="telemetryHeading">Norte</span>
+              <span class="tele-lbl">Direção da Bússola</span>
+            </div>
+          </div>
+          <div class="telemetry-card">
+            <div class="tele-icon">📍</div>
+            <div class="tele-data">
+              <span class="tele-val" id="telemetryDistance">0.0</span>
+              <span class="tele-lbl">Distância Rodada (km)</span>
+            </div>
+          </div>
+        </div>
+
+      </div>
+    </section>
+
+  </main>
+
+  <!-- ============================================================ -->
+  <!-- BARRA DE SIMULADOR DE DIREÇÃO (Ideal para testar no PC) -->
+  <!-- ============================================================ -->
+  <footer class="simulator-bar" id="simulatorBar">
+    <div class="sim-header">
+      <div class="sim-title">
+        <span class="sim-dot"></span>
+        <strong>Simulador de Direção (Ambiente de Testes)</strong>
+        <span class="sim-helper">Use para testar aceleração, velocímetros e alertas sem precisar de um carro</span>
+      </div>
+      <button class="sim-close-btn" id="btnCloseSim" title="Ocultar barra do simulador">✕</button>
+    </div>
+
+    <div class="sim-controls">
+      <!-- Slider de Velocidade Simulada -->
+      <div class="sim-slider-group">
+        <label for="simSpeedSlider" class="sim-label">
+          Acelerador Virtual: <strong id="simSpeedDisplay">0 km/h</strong>
+        </label>
+        <input type="range" id="simSpeedSlider" min="0" max="180" value="0" step="1" class="sim-slider">
+      </div>
+
+      <!-- Botões Rápidos de Simulação -->
+      <div class="sim-btn-group">
+        <button class="sim-btn" id="btnSimAcc10">+10 km/h</button>
+        <button class="sim-btn" id="btnSimAcc50">50 km/h</button>
+        <button class="sim-btn" id="btnSimAcc80">80 km/h (Alerta)</button>
+        <button class="sim-btn" id="btnSimAcc120">120 km/h (Crítico)</button>
+        <button class="sim-btn sim-btn-brake" id="btnSimBrake">🛑 Frear Total</button>
+        <button class="sim-btn sim-btn-incident" id="btnSimTriggerIncident">🚨 Simular Radar Próximo</button>
+      </div>
+    </div>
+  </footer>
+
+  <!-- ============================================================ -->
+  <!-- MODAL 1: REPORTAR OCORRÊNCIA COLABORATIVA (ESTILO WAZE) -->
+  <!-- ============================================================ -->
+  <div class="modal-backdrop" id="modalReport" hidden>
+    <div class="modal-card modal-report-card">
+      <div class="modal-header">
+        <div class="modal-header-icon">📢</div>
+        <div>
+          <h3 class="modal-title">Reportar Ocorrência na Via</h3>
+          <p class="modal-subtitle">Ajude os outros motoristas informando o que está acontecendo agora nesta localização.</p>
+        </div>
+        <button class="modal-close-btn" id="btnCloseReportModal">✕</button>
+      </div>
+
+      <div class="incident-grid" id="incidentTypeGrid">
+        <!-- 1. Polícia / Blitz -->
+        <button class="incident-btn" data-type="police" data-title="Polícia / Fiscalização" data-icon="🚔" data-sound="Atenção: Fiscalização policial na via">
+          <span class="inc-icon">🚔</span>
+          <span class="inc-name">Polícia / Blitz</span>
+          <span class="inc-desc">Viatura ou fiscalização ativa</span>
+        </button>
+
+        <!-- 2. Radar Móvel ou Fixo -->
+        <button class="incident-btn" data-type="radar" data-title="Radar de Velocidade" data-icon="📸" data-sound="Atenção: Radar reportado à frente">
+          <span class="inc-icon">📸</span>
+          <span class="inc-name">Radar de Velocidade</span>
+          <span class="inc-desc">Radar móvel ou não sinalizado</span>
+        </button>
+
+        <!-- 3. Acidente -->
+        <button class="incident-btn" data-type="accident" data-title="Acidente na Pista" data-icon="🚗💥" data-sound="Atenção: Acidente na pista à frente">
+          <span class="inc-icon">🚗💥</span>
+          <span class="inc-name">Acidente</span>
+          <span class="inc-desc">Colisão na faixa ou acostamento</span>
+        </button>
+
+        <!-- 4. Buraco / Pista Ruim -->
+        <button class="incident-btn" data-type="pothole" data-title="Buraco / Pista Danificada" data-icon="🕳️" data-sound="Cuidado: Buraco na pista">
+          <span class="inc-icon">🕳️</span>
+          <span class="inc-name">Buraco na Via</span>
+          <span class="inc-desc">Perigo de danificar pneus e suspensão</span>
+        </button>
+
+        <!-- 5. Trânsito Parado / Congestionamento -->
+        <button class="incident-btn" data-type="traffic" data-title="Trânsito Parado / Lentidão" data-icon="🛑" data-sound="Atenção: Trânsito lento à frente">
+          <span class="inc-icon">🛑</span>
+          <span class="inc-name">Engarrafamento</span>
+          <span class="inc-desc">Tráfego lento ou totalmente parado</span>
+        </button>
+
+        <!-- 6. Obras na Pista -->
+        <button class="incident-btn" data-type="works" data-title="Obras na Pista" data-icon="🚧" data-sound="Atenção: Obras e homens na pista">
+          <span class="inc-icon">🚧</span>
+          <span class="inc-name">Obras / Desvio</span>
+          <span class="inc-desc">Pista em reforma ou homens trabalhando</span>
+        </button>
+
+        <!-- 7. Perigo / Animal solto / Óleo -->
+        <button class="incident-btn" data-type="hazard" data-title="Perigo na Pista" data-icon="⚠️" data-sound="Atenção: Perigo na pista à frente">
+          <span class="inc-icon">⚠️</span>
+          <span class="inc-name">Perigo na Faixa</span>
+          <span class="inc-desc">Animal, objeto ou óleo na pista</span>
+        </button>
+
+        <!-- 8. Alagamento / Neblina -->
+        <button class="incident-btn" data-type="weather" data-title="Alagamento / Neblina Intensa" data-icon="🌧️" data-sound="Atenção: Pista alagada ou neblina">
+          <span class="inc-icon">🌧️</span>
+          <span class="inc-name">Chuva / Alagamento</span>
+          <span class="inc-desc">Pista alagada ou visibilidade zero</span>
+        </button>
+      </div>
+
+      <!-- Detalhes Opcionais Rápidos -->
+      <div class="report-extra-row">
+        <span class="report-lane-label">Faixa:</span>
+        <div class="report-lane-tags">
+          <button class="lane-tag active" data-lane="any">Todas</button>
+          <button class="lane-tag" data-lane="left">Faixa Esquerda</button>
+          <button class="lane-tag" data-lane="right">Faixa Direita</button>
+          <button class="lane-tag" data-lane="shoulder">Acostamento</button>
+        </div>
+      </div>
+
+      <div class="modal-footer">
+        <button class="btn-cancel" id="btnCancelReport">Cancelar</button>
+        <button class="btn-confirm-report" id="btnSubmitReport">
+          <span>🚀</span> Publicar Alerta na Rede
+        </button>
+      </div>
+    </div>
+  </div>
+
+  <!-- ============================================================ -->
+  <!-- MODAL 2: SELETOR DE LIMITE DE VELOCIDADE (Placas R-19) -->
+  <!-- ============================================================ -->
+  <div class="modal-backdrop" id="modalSpeedLimit" hidden>
+    <div class="modal-card modal-speed-card">
+      <div class="modal-header">
+        <div class="modal-header-icon">🛑</div>
+        <div>
+          <h3 class="modal-title">Escolher Limite de Velocidade</h3>
+          <p class="modal-subtitle">Selecione a velocidade máxima permitida na via para ativar os avisos sonoros e visuais.</p>
+        </div>
+        <button class="modal-close-btn" id="btnCloseSpeedModal">✕</button>
+      </div>
+
+      <div class="speed-signs-grid">
+        <button class="sign-pick-btn" data-speed="30">
+          <span class="sign-circle">30</span>
+          <span class="sign-name">Via Local</span>
+        </button>
+        <button class="sign-pick-btn" data-speed="40">
+          <span class="sign-circle">40</span>
+          <span class="sign-name">Bairro</span>
+        </button>
+        <button class="sign-pick-btn" data-speed="50">
+          <span class="sign-circle">50</span>
+          <span class="sign-name">Coletora</span>
+        </button>
+        <button class="sign-pick-btn active" data-speed="60">
+          <span class="sign-circle">60</span>
+          <span class="sign-name">Avenida</span>
+        </button>
+        <button class="sign-pick-btn" data-speed="70">
+          <span class="sign-circle">70</span>
+          <span class="sign-name">Expressa</span>
+        </button>
+        <button class="sign-pick-btn" data-speed="80">
+          <span class="sign-circle">80</span>
+          <span class="sign-name">Trânsito Rápido</span>
+        </button>
+        <button class="sign-pick-btn" data-speed="90">
+          <span class="sign-circle">90</span>
+          <span class="sign-name">Rodovia Pista Simples</span>
+        </button>
+        <button class="sign-pick-btn" data-speed="100">
+          <span class="sign-circle">100</span>
+          <span class="sign-name">Rodovia Padrão</span>
+        </button>
+        <button class="sign-pick-btn" data-speed="110">
+          <span class="sign-circle">110</span>
+          <span class="sign-name">Rodovia Dupla</span>
+        </button>
+        <button class="sign-pick-btn" data-speed="120">
+          <span class="sign-circle">120</span>
+          <span class="sign-name">Autoestrada</span>
+        </button>
+      </div>
+
+      <div class="auto-detect-box">
+        <label class="toggle-control">
+          <input type="checkbox" id="chkAutoDetectLimit" checked>
+          <span class="toggle-slider"></span>
+          <span class="toggle-label">Auto-detectar velocidade máxima pelo mapa quando disponível</span>
+        </label>
+      </div>
+
+      <div class="modal-footer">
+        <button class="btn-confirm-primary" id="btnConfirmSpeedLimit">Pronto</button>
+      </div>
+    </div>
+  </div>
+
+  <!-- ============================================================ -->
+  <!-- MODAL 3: CONEXÃO DO BANCO DE DADOS EM TEMPO REAL (FIREBASE) -->
+  <!-- ============================================================ -->
+  <div class="modal-backdrop" id="modalCloud" hidden>
+    <div class="modal-card modal-cloud-card">
+      <div class="modal-header">
+        <div class="modal-header-icon">☁️</div>
+        <div>
+          <h3 class="modal-title">Sincronização em Tempo Real</h3>
+          <p class="modal-subtitle">Como os motoristas compartilham alertas entre si no Velox GPS.</p>
+        </div>
+        <button class="modal-close-btn" id="btnCloseCloudModal">✕</button>
+      </div>
+
+      <div class="cloud-status-banner" id="cloudStatusBanner">
+        <div class="cloud-banner-icon">🟢</div>
+        <div>
+          <strong id="cloudStatusTitle">Modo Simulado / Demonstração Ativo</strong>
+          <p id="cloudStatusDesc">Os alertas que você reportar são salvos na memória e geram reações imediatas na tela. Para conectar múltiplos celulares reais simultaneamente pela internet, basta colar suas chaves gratuitas do Firebase abaixo.</p>
+        </div>
+      </div>
+
+      <div class="cloud-config-form">
+        <h4 class="form-title">Conectar Projeto Firebase Real (Opcional):</h4>
+        <p class="form-help">
+          Crie um projeto grátis no <a href="https://console.firebase.google.com" target="_blank" rel="noopener">Firebase Console</a>, ative o Cloud Firestore e cole as chaves do seu Web App:
+        </p>
+
+        <div class="form-group">
+          <label>Configuração do Firebase (JSON ou campos):</label>
+          <textarea id="firebaseConfigInput" class="config-textarea" rows="5" placeholder='{
+  "apiKey": "AIzaSy...",
+  "authDomain": "seu-app.firebaseapp.com",
+  "projectId": "seu-app",
+  "storageBucket": "seu-app.appspot.com",
+  "messagingSenderId": "...",
+  "appId": "..."
+}'></textarea>
+        </div>
+
+        <div class="cloud-actions">
+          <button class="btn-cloud-connect" id="btnConnectFirebase">
+            <span>⚡</span> Salvar e Conectar Nuvem
+          </button>
+          <button class="btn-cloud-reset" id="btnResetFirebase">
+            Restaurar Modo Simulado
+          </button>
+        </div>
+      </div>
+
+      <div class="modal-footer">
+        <button class="btn-confirm-primary" id="btnConfirmCloudModal">Fechar</button>
+      </div>
+    </div>
+  </div>
+
+  <!-- ============================================================ -->
+  <!-- MODAL 4: VALIDAÇÃO COMUNITÁRIA ("AINDA ESTÁ AQUI?") -->
+  <!-- ============================================================ -->
+  <div class="modal-backdrop" id="modalVerify" hidden>
+    <div class="modal-card modal-verify-card">
+      <div class="verify-icon" id="verifyIncidentIcon">🚔</div>
+      <h3 class="verify-title" id="verifyIncidentTitle">Polícia / Fiscalização</h3>
+      <p class="verify-desc" id="verifyIncidentDesc">Você passou pelo ponto marcado há 10 minutos. A ocorrência ainda está no local?</p>
+      
+      <div class="verify-actions">
+        <button class="btn-verify-yes" id="btnVerifyYes">
+          <span>👍</span> Sim, ainda está lá
+        </button>
+        <button class="btn-verify-no" id="btnVerifyNo">
+          <span>❌</span> Não está mais
+        </button>
+      </div>
+    </div>
+  </div>
+
+  <!-- ============================================================ -->
+  <!-- MODAL 5: GUIA DE INSTALAÇÃO NO CELULAR (PWA & APLICATIVO) -->
+  <!-- ============================================================ -->
+  <div class="modal-backdrop" id="modalInstall" hidden>
+    <div class="modal-card modal-install-card">
+      <div class="modal-header">
+        <div class="modal-header-icon">📲</div>
+        <div>
+          <h3 class="modal-title">Instalar Velox GPS no seu Celular</h3>
+          <p class="modal-subtitle">Como transformar esta ferramenta em um aplicativo instalado na tela inicial.</p>
+        </div>
+        <button class="modal-close-btn" id="btnCloseInstallModal">✕</button>
+      </div>
+
+      <div class="install-guides-grid">
+        <!-- Guia Android -->
+        <div class="install-guide-box">
+          <div class="install-platform-badge android">🤖 CELULAR ANDROID (Chrome)</div>
+          <ol class="install-steps">
+            <li>Abra o link do Velox GPS no <strong>Google Chrome</strong> do seu celular.</li>
+            <li>Toque nos <strong>3 pontinhos</strong> no canto superior direito do Chrome.</li>
+            <li>Selecione <strong>"Instalar aplicativo"</strong> ou <strong>"Adicionar à tela inicial"</strong>.</li>
+            <li>Pronto! O ícone do Velox GPS vai aparecer junto com seus outros aplicativos.</li>
+          </ol>
+        </div>
+
+        <!-- Guia iPhone -->
+        <div class="install-guide-box">
+          <div class="install-platform-badge ios">🍏 IPHONE / IPAD (Safari)</div>
+          <ol class="install-steps">
+            <li>Abra o link do Velox GPS no <strong>Safari</strong> do seu iPhone.</li>
+            <li>Toque no botão de <strong>Compartilhar</strong> (quadrado com uma seta apontando para cima ⬆️).</li>
+            <li>Role a lista para baixo e toque em <strong>"Adicionar à Tela de Início"</strong>.</li>
+            <li>Toque em <strong>"Adicionar"</strong> no canto superior direito.</li>
+          </ol>
+        </div>
+      </div>
+
+      <div class="install-benefits-box">
+        <div class="benefit-item">✨ <strong>Tela Cheia Pura:</strong> Roda sem barra de endereços, como app nativo.</div>
+        <div class="benefit-item">💡 <strong>Tela Sempre Ligada:</strong> Trava a tela para não apagar enquanto você dirige.</div>
+        <div class="benefit-item">📡 <strong>GPS por Satélite:</strong> Medição de velocidade em tempo real via 4G/5G.</div>
+      </div>
+
+      <div class="modal-footer">
+        <button class="btn-confirm-primary" id="btnConfirmInstallModal">Entendido!</button>
+      </div>
+    </div>
+  </div>
+
+  <!-- Sons e Sintetizador Web Audio API embutidos via app.js -->
+  <script src="app.js"></script>
+</body>
+</html>
