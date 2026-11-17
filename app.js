@@ -39,8 +39,13 @@
     },
     watchId: null,
 
-    // Áudio e Alertas
-    audioMode: 'voice', // 'voice' | 'beep' | 'mute'
+    // Visualização e Camadas do Mapa (Estilo Waze & Satélite)
+    mapLayer: 'drawing', // 'drawing' (vetorial nítido Waze) | 'satellite' (satélite real terrestre)
+    mapTheme: 'auto', // 'auto' (escurece às 18h) | 'day' (dia claro) | 'night' (noite escuro)
+    is3D: false, // Visão 2D / 3D inclinada com perspectiva
+
+    // Áudio e Alertas (3 Modos Configuráveis)
+    audioMode: 'voice', // 'voice' (voz e alertas) | 'alerts' (somente alertas sonoros) | 'mute' (silencioso)
     audioCtx: null,
     lastOverspeedAlertTime: 0,
     lastProxAlertId: null,
@@ -90,8 +95,8 @@
       type: 'radar',
       title: 'Radar de Velocidade (60 km/h)',
       icon: '📸',
-      lat: -23.563820,
-      lng: -46.653410,
+      lat: -23.568820,
+      lng: -46.647410,
       road: 'Av. Paulista',
       lane: 'Todas',
       timeText: 'Reportado há 4 min',
@@ -199,6 +204,12 @@
     btnRecenter: document.getElementById('btnRecenter'),
     btnCompass: document.getElementById('btnCompass'),
     btnOpenReportModal: document.getElementById('btnOpenReportModal'),
+    btnToggle3D: document.getElementById('btnToggle3D'),
+    label3D: document.getElementById('label3D'),
+    btnToggleLayer: document.getElementById('btnToggleLayer'),
+    layerIcon: document.getElementById('layerIcon'),
+    btnToggleDayNight: document.getElementById('btnToggleDayNight'),
+    dayNightIcon: document.getElementById('dayNightIcon'),
 
     // Cockpit
     themePills: document.querySelectorAll('.theme-pill'),
@@ -344,7 +355,8 @@
 
     // Fala por voz sintetizada em Português do Brasil (PT-BR)
     speak(phrase) {
-      if (State.audioMode === 'mute' || State.audioMode === 'beep') return;
+      // Fala APENAS se o modo de áudio for 'voice' (Voz e Alertas)
+      if (State.audioMode !== 'voice') return;
       if (!('speechSynthesis' in window)) return;
 
       try {
@@ -367,6 +379,13 @@
     leafletMap: null,
     carMarker: null,
     incidentMarkersGroup: null,
+    tileVoyager: null,
+    tileDark: null,
+    tileSatellite: null,
+    activeTileLayer: null,
+    routeLineGlow: null,
+    routeLineCore: null,
+    destinationMarker: null,
 
     init() {
       if (typeof L === 'undefined') {
@@ -374,16 +393,34 @@
         return;
       }
 
+      // 1. Camada Waze Desenho Claro (CartoDB Voyager - visual vetor nítido e colorido)
+      this.tileVoyager = L.tileLayer('https://{s}.basemaps.cartocdn.com/rastertiles/voyager/{z}/{x}/{y}{r}.png', {
+        maxZoom: 19,
+        subdomains: 'abcd',
+        attribution: '&copy; CartoDB &copy; OpenStreetMap'
+      });
+
+      // 2. Camada Waze Desenho Noturno (CartoDB Dark Matter)
+      this.tileDark = L.tileLayer('https://{s}.basemaps.cartocdn.com/rastertiles/dark_all/{z}/{x}/{y}{r}.png', {
+        maxZoom: 19,
+        subdomains: 'abcd',
+        attribution: '&copy; CartoDB &copy; OpenStreetMap'
+      });
+
+      // 3. Camada Satélite Fotográfico Real Terrestre (Esri World Imagery)
+      this.tileSatellite = L.tileLayer('https://server.arcgisonline.com/ArcGIS/rest/services/World_Imagery/MapServer/tile/{z}/{y}/{x}', {
+        maxZoom: 19,
+        attribution: 'Esri World Imagery'
+      });
+
       // Inicializa o mapa centralizado em São Paulo / Av. Paulista
       this.leafletMap = L.map('map', {
         zoomControl: false,
         attributionControl: false
       }).setView([State.position.lat, State.position.lng], 16);
 
-      // Camada de Tiles do OpenStreetMap
-      L.tileLayer('https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png', {
-        maxZoom: 19
-      }).addTo(this.leafletMap);
+      // Define a camada e o tema inicial
+      this.updateTileLayer();
 
       // Grupo de Marcadores de Ocorrências
       this.incidentMarkersGroup = L.layerGroup().addTo(this.leafletMap);
@@ -406,6 +443,113 @@
 
       // Renderiza as ocorrências no mapa
       this.renderIncidents();
+
+      // Monitor de horário automático (reavalia a cada 60s se chegou às 18h)
+      setInterval(() => {
+        if (State.mapTheme === 'auto') {
+          this.updateTileLayer();
+        }
+      }, 60000);
+    },
+
+    updateTileLayer() {
+      if (!this.leafletMap) return;
+
+      // 1. Determina se o tema é Dia ou Noite
+      const hour = new Date().getHours();
+      let isNight = false;
+      if (State.mapTheme === 'auto') {
+        isNight = (hour >= 18 || hour < 6); // Automático: escuro a partir das 18h até 06h
+      } else if (State.mapTheme === 'night') {
+        isNight = true;
+      } else {
+        isNight = false;
+      }
+
+      // Aplica classes visuais no body (tema claro diurno estilo Waze vs noturno)
+      if (isNight) {
+        document.body.classList.remove('theme-day');
+        document.body.classList.add('theme-dark');
+      } else {
+        document.body.classList.remove('theme-dark');
+        document.body.classList.add('theme-day');
+      }
+
+      // 2. Determina qual camada de mapa carregar
+      let targetLayer = this.tileVoyager;
+      if (State.mapLayer === 'satellite') {
+        targetLayer = this.tileSatellite;
+      } else if (isNight) {
+        targetLayer = this.tileDark;
+      } else {
+        targetLayer = this.tileVoyager;
+      }
+
+      // 3. Aplica a camada de mapa ao Leaflet
+      if (this.activeTileLayer !== targetLayer) {
+        if (this.activeTileLayer && this.leafletMap.hasLayer(this.activeTileLayer)) {
+          this.leafletMap.removeLayer(this.activeTileLayer);
+        }
+        targetLayer.addTo(this.leafletMap);
+        this.activeTileLayer = targetLayer;
+      }
+    },
+
+    toggle3D() {
+      State.is3D = !State.is3D;
+      const mapEl = document.getElementById('map');
+      const btn3D = document.getElementById('btnToggle3D');
+      const label3D = document.getElementById('label3D');
+
+      if (State.is3D) {
+        mapEl.classList.remove('view-2d');
+        mapEl.classList.add('view-3d');
+        if (btn3D) btn3D.classList.add('active');
+        if (label3D) label3D.textContent = '2D';
+        AudioEngine.playBeep(750, 0.1);
+      } else {
+        mapEl.classList.remove('view-3d');
+        mapEl.classList.add('view-2d');
+        if (btn3D) btn3D.classList.remove('active');
+        if (label3D) label3D.textContent = '3D';
+        AudioEngine.playBeep(550, 0.1);
+      }
+
+      setTimeout(() => {
+        if (this.leafletMap) this.leafletMap.invalidateSize();
+      }, 350);
+    },
+
+    toggleLayer() {
+      AudioEngine.init();
+      if (State.mapLayer === 'drawing') {
+        State.mapLayer = 'satellite';
+        if (UI.layerIcon) UI.layerIcon.textContent = '🗺️';
+        AudioEngine.speak('Modo satélite real ativado.');
+      } else {
+        State.mapLayer = 'drawing';
+        if (UI.layerIcon) UI.layerIcon.textContent = '🛰️';
+        AudioEngine.speak('Modo mapa desenho ativado.');
+      }
+      this.updateTileLayer();
+    },
+
+    toggleTheme() {
+      AudioEngine.init();
+      if (State.mapTheme === 'auto') {
+        State.mapTheme = 'day';
+        if (UI.dayNightIcon) UI.dayNightIcon.textContent = '☀️';
+        AudioEngine.speak('Tema dia ativado.');
+      } else if (State.mapTheme === 'day') {
+        State.mapTheme = 'night';
+        if (UI.dayNightIcon) UI.dayNightIcon.textContent = '🌙';
+        AudioEngine.speak('Tema noturno ativado.');
+      } else {
+        State.mapTheme = 'auto';
+        if (UI.dayNightIcon) UI.dayNightIcon.textContent = '⏰';
+        AudioEngine.speak('Tema automático ativado. Mudará às 18 horas.');
+      }
+      this.updateTileLayer();
     },
 
     updateCarPosition(lat, lng, heading = 0) {
@@ -653,6 +797,11 @@
       let minDistance = Infinity;
 
       State.incidents.forEach(inc => {
+        // Ignora incidentes temporariamente silenciados pelo usuário através do botão X
+        if (inc.dismissedUntil && now < inc.dismissedUntil) {
+          return;
+        }
+
         const dist = this.calculateDistanceMeters(
           State.position.lat,
           State.position.lng,
@@ -666,29 +815,52 @@
         }
       });
 
-      // Se estiver a menos de 500 metros de uma ocorrência
-      if (closestIncident && minDistance <= 500) {
+      // Se não houver nenhum incidente ou se estiver longe (> 550m)
+      if (!closestIncident || minDistance > 550) {
+        if (!UI.proximityBanner.hasAttribute('hidden')) {
+          UI.proximityBanner.setAttribute('hidden', '');
+        }
+        return;
+      }
+
+      // Histerese inteligente:
+      // Se o banner já estiver visível, mantém até 550m.
+      // Se não estiver visível, só abre quando aproximar de 400m.
+      // Isso elimina 100% o efeito de abrir/fechar rápido por oscilação do GPS!
+      const isAlreadyShowing = !UI.proximityBanner.hasAttribute('hidden');
+      const shouldShow = isAlreadyShowing ? (minDistance <= 550) : (minDistance <= 400);
+
+      if (shouldShow) {
         this.showProximityAlert(closestIncident, Math.round(minDistance));
 
-        // Toca o som apenas se for um novo incidente ou se já passou mais de 20s
-        if (State.lastProxAlertId !== closestIncident.id || (now - State.lastProxAlertTime > 20000)) {
+        // Evita disparar avisos e voz em loop se o veículo estiver parado (< 3 km/h em casa/escritório)
+        const isStationary = (State.currentSpeed < 3 && !State.isSimulatorActive);
+
+        // Cooldown de 60 segundos por incidente para nunca ficar repetindo sem parar
+        const canAlert = (State.lastProxAlertId !== closestIncident.id) || (now - State.lastProxAlertTime > 60000);
+
+        if (canAlert && !isStationary) {
           State.lastProxAlertId = closestIncident.id;
           State.lastProxAlertTime = now;
 
+          // Emite o bipe de aproximação se o som não estiver mudo
           AudioEngine.playIncidentChime();
-          const distInt = Math.round(minDistance / 50) * 50; // Arredonda para 400m, 350m...
-          const phrase = `${closestIncident.soundText} a ${distInt > 0 ? distInt : 100} metros`;
-          setTimeout(() => AudioEngine.speak(phrase), 400);
+
+          // Fala o alerta por voz apenas se o modo de som for 'voice' (Voz e Alertas)
+          if (State.audioMode === 'voice') {
+            const distInt = Math.round(minDistance / 50) * 50; // Arredonda para 400m, 350m...
+            const phrase = `${closestIncident.soundText} a ${distInt > 0 ? distInt : 100} metros`;
+            setTimeout(() => AudioEngine.speak(phrase), 450);
+          }
         }
 
-        // Se estiver muito perto (menos de 60 metros), sugere a validação ("Ainda está aqui?")
-        if (minDistance <= 60 && !closestIncident.verifiedThisTrip) {
+        // Se estiver muito perto (menos de 60 metros) e em trânsito, sugere a validação ("Ainda está aqui?")
+        if (minDistance <= 60 && !closestIncident.verifiedThisTrip && !isStationary) {
           closestIncident.verifiedThisTrip = true;
           this.promptVerification(closestIncident);
         }
       } else {
-        // Se afastou de todas as ocorrências
-        if (!UI.proximityBanner.hasAttribute('hidden') && minDistance > 650) {
+        if (isAlreadyShowing) {
           UI.proximityBanner.setAttribute('hidden', '');
         }
       }
@@ -851,10 +1023,12 @@
       // 6. Alerta Sonoro de Excesso de Velocidade
       if (isOverspeed) {
         const now = Date.now();
-        if (now - State.lastOverspeedAlertTime > 6000) {
+        if (now - State.lastOverspeedAlertTime > 12000) {
           State.lastOverspeedAlertTime = now;
           AudioEngine.playOverspeedChime();
-          AudioEngine.speak(`Atenção: velocidade máxima de ${limit} quilômetros por hora excedida.`);
+          if (State.audioMode === 'voice') {
+            AudioEngine.speak(`Atenção: limite de ${limit} quilômetros por hora excedido.`);
+          }
         }
       }
 
@@ -909,16 +1083,17 @@
 
     onPositionSuccess(pos) {
       State.position.hasRealGps = true;
-      UI.gpsStatusText.textContent = `GPS Ativo (precisão: ±${Math.round(pos.coords.accuracy)}m)`;
+      UI.gpsStatusText.textContent = `GPS Ativo (±${Math.round(pos.coords.accuracy)}m)`;
 
       const lat = pos.coords.latitude;
       const lng = pos.coords.longitude;
       const heading = pos.coords.heading || 0;
 
-      // Velocidade do GPS vem em metros por segundo (m/s). Multiplicamos por 3.6 para km/h!
+      // Velocidade do GPS vem em metros por segundo (m/s).
+      // Se for menor que 0.8 m/s (~2.8 km/h), filtra ruído/jitter de aparelho parado dentro de casa!
       let gpsSpeedKmH = 0;
-      if (pos.coords.speed !== null && !isNaN(pos.coords.speed)) {
-        gpsSpeedKmH = Math.max(0, pos.coords.speed * 3.6);
+      if (pos.coords.speed !== null && !isNaN(pos.coords.speed) && pos.coords.speed > 0.8) {
+        gpsSpeedKmH = Math.max(0, Math.round(pos.coords.speed * 3.6));
       }
 
       State.position.lat = lat;
@@ -1448,23 +1623,23 @@
       }
     });
 
-    // 4. Controle de Áudio
+    // 4. Controle de Áudio (3 Modos: Voz & Alertas / Somente Alertas / Silencioso)
     UI.btnAudioToggle.addEventListener('click', () => {
       AudioEngine.init();
       if (State.audioMode === 'voice') {
-        State.audioMode = 'beep';
+        State.audioMode = 'alerts';
         UI.audioIcon.textContent = '🔔';
-        UI.audioLabel.textContent = 'Som Bipe';
-        AudioEngine.playBeep(880, 0.15);
-      } else if (State.audioMode === 'beep') {
+        UI.audioLabel.textContent = 'Alertas';
+        AudioEngine.playIncidentChime();
+      } else if (State.audioMode === 'alerts') {
         State.audioMode = 'mute';
         UI.audioIcon.textContent = '🔇';
-        UI.audioLabel.textContent = 'Mudo';
+        UI.audioLabel.textContent = 'Silencioso';
       } else {
         State.audioMode = 'voice';
         UI.audioIcon.textContent = '🔊';
-        UI.audioLabel.textContent = 'Voz & Som';
-        AudioEngine.speak('Alertas por voz ativados.');
+        UI.audioLabel.textContent = 'Voz & Alertas';
+        AudioEngine.speak('Voz e alertas ativados.');
       }
     });
 
@@ -1473,10 +1648,37 @@
       MapEngine.recenter();
     });
 
-    // 6. Fechar Alerta de Proximidade
+    // 6. Fechar Alerta de Proximidade (Silencia o incidente atual por 5 minutos)
     UI.btnDismissProx.addEventListener('click', () => {
       UI.proximityBanner.setAttribute('hidden', '');
+      if (State.lastProxAlertId) {
+        const inc = State.incidents.find(i => i.id === State.lastProxAlertId);
+        if (inc) {
+          inc.dismissedUntil = Date.now() + 300000;
+        }
+      }
     });
+
+    // 6.1. Alternar Visão 2D / 3D Inclinada Waze
+    if (UI.btnToggle3D) {
+      UI.btnToggle3D.addEventListener('click', () => {
+        MapEngine.toggle3D();
+      });
+    }
+
+    // 6.2. Alternar Mapa Desenho (Waze) vs. Satélite Real Terrestre
+    if (UI.btnToggleLayer) {
+      UI.btnToggleLayer.addEventListener('click', () => {
+        MapEngine.toggleLayer();
+      });
+    }
+
+    // 6.3. Alternar Tema Dia / Noite / Automático 18h
+    if (UI.btnToggleDayNight) {
+      UI.btnToggleDayNight.addEventListener('click', () => {
+        MapEngine.toggleTheme();
+      });
+    }
 
     // 7. Modal de Reportar Ocorrência
     UI.btnOpenReportModal.addEventListener('click', () => {

@@ -232,6 +232,21 @@
 
         <!-- Lado Direito Inferior: Botões de Ação do Motorista -->
         <div class="floating-action-cluster">
+          <!-- Botão 2D / 3D (Perspectiva de Direção Waze) -->
+          <button class="fab-btn fab-secondary fab-pill" id="btnToggle3D" title="Alternar Visão 2D e 3D Inclinada (Waze)">
+            <span id="label3D" style="font-weight:900; font-size:0.85rem; letter-spacing:0.5px;">3D</span>
+          </button>
+
+          <!-- Botão Desenho Waze vs. Satélite Real -->
+          <button class="fab-btn fab-secondary" id="btnToggleLayer" title="Alternar Mapa Desenho (Waze) e Satélite Real">
+            <span id="layerIcon" style="font-size:1.3rem;">🛰️</span>
+          </button>
+
+          <!-- Botão Modo Claro / Modo Noite / Automático 18h -->
+          <button class="fab-btn fab-secondary" id="btnToggleDayNight" title="Tema: Dia / Noite (Muda sozinho às 18h)">
+            <span id="dayNightIcon" style="font-size:1.25rem;">☀️</span>
+          </button>
+
           <!-- Botão Centralizar Veículo -->
           <button class="fab-btn fab-secondary" id="btnRecenter" title="Centralizar mapa na minha posição">
             <svg viewBox="0 0 24 24" width="24" height="24" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round">

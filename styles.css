@@ -349,12 +349,21 @@ button {
   width: 100%;
   height: 100%;
   z-index: 10;
-  background-color: #0b1120;
+  background-color: #e2e8f0;
+  perspective: 900px;
+  overflow: hidden;
 }
 
-/* Customização dos tiles do mapa para modo escuro */
-.leaflet-tile {
-  filter: brightness(0.7) invert(1) contrast(3) hue-rotate(200deg) saturate(0.3) brightness(0.7);
+/* Visão 3D Inclinada Estilo Waze */
+#map.view-3d .leaflet-map-pane {
+  transform: perspective(650px) rotateX(46deg) translateY(-25px) scale(1.15);
+  transform-origin: 50% 86%;
+  transition: transform 0.4s cubic-bezier(0.16, 1, 0.3, 1);
+}
+
+#map.view-2d .leaflet-map-pane {
+  transform: none;
+  transition: transform 0.4s cubic-bezier(0.16, 1, 0.3, 1);
 }
 
 /* ==========================================================================
@@ -1010,6 +1019,13 @@ button {
 .fab-secondary:hover {
   background: #334155;
   transform: translateY(-2px);
+}
+
+.fab-secondary.active {
+  background: #0284c7 !important;
+  color: #ffffff !important;
+  border-color: #38bdf8 !important;
+  box-shadow: 0 0 16px rgba(2, 132, 199, 0.65) !important;
 }
 
 /* Botão Principal Reportar Estilo Waze */
@@ -2196,6 +2212,195 @@ button {
 
 .benefit-item strong {
   color: #e2e8f0;
+}
+
+/* ==========================================================================
+   TEMA DIURNO CLARO (ESTILO WAZE & GOOGLE MAPS PADRÃO)
+   ========================================================================== */
+body.theme-day {
+  --bg-core: #f1f5f9;
+  --bg-surface: #ffffff;
+  --bg-card: #ffffff;
+  --bg-elevated: #f8fafc;
+  --text-primary: #0f172a;
+  --text-secondary: #475569;
+  --text-muted: #64748b;
+  background-color: #f1f5f9;
+  color: #0f172a;
+}
+
+body.theme-day .app-header {
+  background: rgba(255, 255, 255, 0.95);
+  border-bottom: 1px solid rgba(0, 0, 0, 0.08);
+}
+
+body.theme-day .brand-title {
+  color: #0f172a;
+}
+
+body.theme-day .mode-tabs {
+  background: #e2e8f0;
+  border-color: rgba(0, 0, 0, 0.06);
+}
+
+body.theme-day .mode-tab {
+  color: #475569;
+}
+
+body.theme-day .mode-tab.active {
+  background: #ffffff;
+  color: #0284c7;
+  box-shadow: 0 2px 8px rgba(0, 0, 0, 0.1);
+}
+
+body.theme-day .ctrl-btn {
+  background: rgba(241, 245, 249, 0.9);
+  color: #0f172a;
+  border-color: rgba(0, 0, 0, 0.1);
+}
+
+body.theme-day .ctrl-btn:hover {
+  background: #e2e8f0;
+}
+
+body.theme-day .search-input-box {
+  background: rgba(255, 255, 255, 0.96);
+  border-color: rgba(2, 132, 199, 0.4);
+  box-shadow: 0 10px 30px rgba(0, 0, 0, 0.12);
+}
+
+body.theme-day .search-dest-input {
+  color: #0f172a;
+}
+
+body.theme-day .search-dest-input::placeholder {
+  color: #64748b;
+}
+
+body.theme-day .quick-chip {
+  background: rgba(255, 255, 255, 0.94);
+  color: #334155;
+  border-color: rgba(0, 0, 0, 0.12);
+  box-shadow: 0 2px 8px rgba(0, 0, 0, 0.08);
+}
+
+body.theme-day .quick-chip:hover {
+  background: #ffffff;
+  color: #0284c7;
+  border-color: #0284c7;
+}
+
+body.theme-day .search-results-dropdown {
+  background: rgba(255, 255, 255, 0.98);
+  border-color: #0284c7;
+  box-shadow: 0 15px 35px rgba(0, 0, 0, 0.18);
+}
+
+body.theme-day .results-header {
+  background: #f1f5f9;
+  color: #64748b;
+  border-color: #e2e8f0;
+}
+
+body.theme-day .result-item {
+  border-bottom: 1px solid #f1f5f9;
+}
+
+body.theme-day .result-item:hover {
+  background: #f8fafc;
+}
+
+body.theme-day .result-main {
+  color: #0f172a;
+}
+
+body.theme-day .result-sub {
+  color: #64748b;
+}
+
+body.theme-day .road-hud {
+  background: rgba(255, 255, 255, 0.95);
+  border-color: rgba(0, 0, 0, 0.1);
+  box-shadow: 0 10px 25px rgba(0, 0, 0, 0.1);
+}
+
+body.theme-day .road-name {
+  color: #0f172a;
+}
+
+body.theme-day .road-icon {
+  background: #f1f5f9;
+}
+
+body.theme-day .road-tag {
+  background: #e2e8f0;
+  color: #334155;
+}
+
+body.theme-day .floating-hud-gauge {
+  background: rgba(255, 255, 255, 0.95);
+  border-color: rgba(0, 0, 0, 0.1);
+  box-shadow: 0 10px 25px rgba(0, 0, 0, 0.12);
+}
+
+body.theme-day .mini-speed-num {
+  color: #0284c7;
+}
+
+body.theme-day .fab-secondary {
+  background: rgba(255, 255, 255, 0.96);
+  color: #0f172a;
+  border-color: rgba(0, 0, 0, 0.12);
+  box-shadow: 0 8px 20px rgba(0, 0, 0, 0.15);
+}
+
+body.theme-day .fab-secondary:hover {
+  background: #f8fafc;
+}
+
+body.theme-day .route-preview-card {
+  background: rgba(255, 255, 255, 0.98);
+  border-color: rgba(16, 185, 129, 0.5);
+  box-shadow: 0 20px 45px rgba(0, 0, 0, 0.18);
+}
+
+body.theme-day .preview-dest-title {
+  color: #0f172a;
+}
+
+body.theme-day .preview-dest-sub {
+  color: #475569;
+}
+
+body.theme-day .preview-stats-row {
+  background: #f8fafc;
+  border-color: #e2e8f0;
+}
+
+body.theme-day .active-maneuver-banner {
+  background: rgba(255, 255, 255, 0.98);
+  border-color: #0284c7;
+  box-shadow: 0 12px 35px rgba(0, 0, 0, 0.2);
+}
+
+body.theme-day .maneuver-street {
+  color: #0f172a;
+}
+
+body.theme-day .simulator-bar {
+  background: rgba(255, 255, 255, 0.96);
+  border-top-color: #0284c7;
+  box-shadow: 0 -8px 25px rgba(0, 0, 0, 0.12);
+}
+
+body.theme-day .sim-btn {
+  background: #f1f5f9;
+  color: #0f172a;
+  border-color: #cbd5e1;
+}
+
+body.theme-day .sim-btn:hover {
+  background: #e2e8f0;
 }
 
 /* ==========================================================================
