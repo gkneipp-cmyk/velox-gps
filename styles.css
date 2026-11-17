@@ -345,25 +345,31 @@ button {
   flex-direction: column;
 }
 
+.map-perspective-wrapper {
+  position: absolute;
+  inset: 0;
+  perspective: 750px;
+  perspective-origin: 50% 88%;
+  overflow: hidden;
+  z-index: 10;
+}
+
 #map {
   width: 100%;
   height: 100%;
-  z-index: 10;
   background-color: #e2e8f0;
-  perspective: 900px;
-  overflow: hidden;
+  transform-origin: 50% 88%;
+  transition: transform 0.45s cubic-bezier(0.16, 1, 0.3, 1);
+  will-change: transform;
 }
 
 /* Visão 3D Inclinada Estilo Waze */
-#map.view-3d .leaflet-map-pane {
-  transform: perspective(650px) rotateX(46deg) translateY(-25px) scale(1.15);
-  transform-origin: 50% 86%;
-  transition: transform 0.4s cubic-bezier(0.16, 1, 0.3, 1);
+.map-perspective-wrapper.view-3d #map {
+  transform: rotateX(46deg) translateY(-25px) scale(1.22);
 }
 
-#map.view-2d .leaflet-map-pane {
+.map-perspective-wrapper.view-2d #map {
   transform: none;
-  transition: transform 0.4s cubic-bezier(0.16, 1, 0.3, 1);
 }
 
 /* ==========================================================================
@@ -2400,13 +2406,17 @@ body.theme-day .qib-texts p {
 }
 
 /* ==========================================================================
-   FILTROS DE MAPA (NOTURNO & DIURNO 100% LIVRES DE API KEY)
+   PALETA DE CORES ESTILO WAZE (DIURNO VIBRANTE & NOTURNO CONTRASTADO)
+   Super leve: processamento 100% via placa gráfica (GPU) sem consumo de CPU
    ========================================================================== */
-body.theme-dark #map:not(.layer-satellite) .leaflet-tile {
-  filter: brightness(0.65) invert(1) contrast(3) hue-rotate(200deg) saturate(0.35);
+body.theme-day #map:not(.layer-satellite) .leaflet-tile {
+  filter: saturate(1.35) contrast(1.08) brightness(1.03);
 }
 
-body.theme-day #map .leaflet-tile,
+body.theme-dark #map:not(.layer-satellite) .leaflet-tile {
+  filter: brightness(0.7) invert(0.92) contrast(1.22) hue-rotate(190deg) saturate(0.85);
+}
+
 #map.layer-satellite .leaflet-tile {
   filter: none !important;
 }

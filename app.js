@@ -495,27 +495,33 @@
 
     toggle3D() {
       State.is3D = !State.is3D;
-      const mapEl = document.getElementById('map');
+      const mapWrapper = document.getElementById('mapWrapper');
       const btn3D = document.getElementById('btnToggle3D');
       const label3D = document.getElementById('label3D');
 
       if (State.is3D) {
-        mapEl.classList.remove('view-2d');
-        mapEl.classList.add('view-3d');
+        if (mapWrapper) {
+          mapWrapper.classList.remove('view-2d');
+          mapWrapper.classList.add('view-3d');
+        }
         if (btn3D) btn3D.classList.add('active');
         if (label3D) label3D.textContent = '2D';
         AudioEngine.playBeep(750, 0.1);
+        AudioEngine.speak('Visão 3D ativada.');
       } else {
-        mapEl.classList.remove('view-3d');
-        mapEl.classList.add('view-2d');
+        if (mapWrapper) {
+          mapWrapper.classList.remove('view-3d');
+          mapWrapper.classList.add('view-2d');
+        }
         if (btn3D) btn3D.classList.remove('active');
         if (label3D) label3D.textContent = '3D';
         AudioEngine.playBeep(550, 0.1);
+        AudioEngine.speak('Visão 2D ativada.');
       }
 
       setTimeout(() => {
         if (this.leafletMap) this.leafletMap.invalidateSize();
-      }, 350);
+      }, 450);
     },
 
     toggleLayer() {
